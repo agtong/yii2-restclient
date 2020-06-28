@@ -103,9 +103,9 @@ class ActiveRecord extends BaseActiveRecord
             $result = static::getDb()->createCommand(['index' => static::modelName()])->insert($values);
 
             $pk = static::primaryKey()[0];
-            $this->$pk = $result['id'];
+            $this->$pk = $result[$pk];
             if ($pk !== 'id') {
-                $values[$pk] = $result['id'];
+                $values[$pk] = $result[$pk];
             }
             $changedAttributes = array_fill_keys(array_keys($values), null);
             $this->setOldAttributes($values);
