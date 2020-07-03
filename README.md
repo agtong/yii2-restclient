@@ -32,7 +32,7 @@ php composer.phar require "apexwire/yii2-restclient"
         'restclient' => [
             'class' => 'apexwire\restclient\Connection',
             'config' => [
-                'base_uri' => 'https://api.site.com/',
+                'baseUrl' => 'https://api.site.com/',
             ],
         ],
     ],
@@ -54,24 +54,33 @@ class MyModel extends \apexwire\restclient\ActiveRecord
 
 ## Debug
 
-Пример подключения debug панели
+Так как расширение использует yii2-httpclient, то можно использовать панели из этой библиотеки
+
+Пример подключения панели
 
 ```php
 $config['modules']['debug'] = [
     'class' => 'yii\debug\Module',
     'panels' => [
-        'rest' => ['class' => 'apexwire\restclient\DebugPanel'],
+        'httpclient' => [
+            'class' => 'yii\\httpclient\\debug\\HttpClientPanel',
+        ],
     ],
 ];
 ```
 
 ## Возможности
 
-- можно указать список полей, которые вернутся: `MyModel::find()->select(['id','name'])`
-- можно указать лимит: `MyModel::find()->limit(2)`
-- поддерживается пагинация
-- поддерживается сортировка
-- поддерживается поиск. Пример [тут](docs/find.md).
+- можно указать список полей, которые вернутся: `MyModel::find()->select(['id','name'])`;
+- можно указать лимит: `MyModel::find()->limit(2)`;
+- поддерживается пагинация;
+- поддерживается сортировка;
+- поддерживается поиск.
+
+## Документация
+
+- [поиск](docs/find.md)
+- [построитель запросов](docs/query.md)
 
 ## Лицензия
 

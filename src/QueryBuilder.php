@@ -13,15 +13,13 @@ namespace apexwire\restclient;
 
 use yii\db\Expression;
 use yii\base\NotSupportedException;
-//use yii\db\QueryBuilder as BaseQueryBuilder;
-use yii\base\Object;
-use Yii;
+use yii\base\BaseObject;
 
 /**
  * Class QueryBuilder builds an HiActiveResource query based on the specification given as a [[Query]] object.
  * @package apexwire\restclient
  */
-class QueryBuilder extends Object
+class QueryBuilder extends BaseObject
 {
     /**
      * @type array
@@ -55,7 +53,6 @@ class QueryBuilder extends Object
         'AND' => 'buildAndCondition',
     ];
 
-
     /**
      * Constructor.
      * @param Connection $connection the database connection.
@@ -77,6 +74,7 @@ class QueryBuilder extends Object
     public function build($query, $params = [])
     {
         $this->buildSelect($query->select, $params);
+        $this->buildExpand($query->expand, $params);
         $this->buildPerPage($query->limit, $params);
         $this->buildPage($query->offset, $query->limit, $params);
         $this->buildFind($query->where, $query->searchModel, $params);
@@ -158,7 +156,6 @@ class QueryBuilder extends Object
      *
      * @param $orderBy
      * @param $params
-     * @return array
      */
     public function buildSort($orderBy, &$params)
     {
@@ -168,12 +165,24 @@ class QueryBuilder extends Object
     }
 
     /**
-     * @inheritdoc
+     * @param $columns
+     * @param $params
      */
     public function buildSelect($columns, &$params)
     {
         if (!empty($columns) AND is_array($columns)) {
             $params['fields'] = implode(',', $columns);
+        }
+    }
+
+    /**
+     * @param $columns
+     * @param $params
+     */
+    public function buildExpand($columns, &$params)
+    {
+        if (!empty($columns) AND is_array($columns)) {
+            $params['expand'] = implode(',', $columns);
         }
     }
 
@@ -212,7 +221,8 @@ class QueryBuilder extends Object
     }
 
     /**
-     * @inheritdoc
+     * @param $condition
+     * @return array
      */
     public function buildHashCondition($condition)
     {
@@ -230,7 +240,10 @@ class QueryBuilder extends Object
     }
 
     /**
-     * @inheritdoc
+     * @param $operator
+     * @param $operands
+     * @param $params
+     * @return array
      */
     public function buildAndCondition($operator, $operands, &$params)
     {

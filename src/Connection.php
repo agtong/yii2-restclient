@@ -12,9 +12,9 @@
 namespace apexwire\restclient;
 
 use Closure;
-use GuzzleHttp\Client as Handler;
-use GuzzleHttp\Exception\ClientException;
-use GuzzleHttp\Psr7\Response;
+use yii\httpclient\Client;
+use yii\httpclient\Response;
+use yii\httpclient\Exception;
 use yii\base\Component;
 use yii\base\InvalidConfigException;
 use yii\helpers\Json;
@@ -30,7 +30,7 @@ use Yii;
  *     'restclient' => [
  *         'class' => 'apexwire\restclient\Connection',
  *         'config' => [
- *             'base_uri' => 'https://api.site.com/',
+ *             'baseUrl' => 'https://api.site.com',
  *         ],
  *     ],
  * ],
@@ -46,14 +46,10 @@ class Connection extends Component
      */
     public $config = [];
 
-    /**
-     * @var Handler
-     */
-    protected static $_handler = null;
+    /** @var Client */
+    protected $_client = null;
 
-    /**
-     * @var array authorization config
-     */
+    /** @var array authorization config */
     protected $_auth = [];
 
     /**
@@ -66,12 +62,17 @@ class Connection extends Component
     /** @type Response */
     protected $_response;
 
-
+    /**
+     * @param $auth
+     */
     public function setAuth($auth)
     {
         $this->_auth = $auth;
     }
 
+    /**
+     * @return array|mixed
+     */
     public function getAuth()
     {
         if ($this->_auth instanceof Closure) {
@@ -87,9 +88,10 @@ class Connection extends Component
      */
     public function init()
     {
-        if (!$this->config['base_uri']) {
-            throw new InvalidConfigException('The `base_uri` config option must be set');
+        if (!$this->config['baseUrl']) {
+            throw new InvalidConfigException('The `baseUrl` config option must be set');
         }
+        $this->_client = new Client($this->config);
     }
 
     /**
@@ -139,110 +141,89 @@ class Connection extends Component
     /**
      * Performs GET HTTP request.
      * @param string $url URL
-     * @param array $query query options
-     * @param string $body request body
-     * @param bool $raw if response body contains JSON and should be decoded
+     * @param array $data query data
+     * @param array $options request options
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function get($url, $query = [], $body = null, $raw = false)
+    public function get($url, $data = [], $options = [])
     {
-        try {
-            return $this->makeRequest('GET', $url, $query, $body, $raw);
-        } catch (ClientException $e) {
-            if (404 === $e->getCode()) {
-                return false;
-            }
-        }
+        $this->makeRequest('GET', $url, $data, $options);
+        return $this->getResponseJsonContent();
     }
 
     /**
      * Performs HEAD HTTP request.
      * @param string $url URL
-     * @param array $query query options
-     * @param string $body request body
+     * @param array $data query data
+     * @param array $options request options
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function head($url, $query = [], $body = null)
+    public function head($url, $data = [], $options = [])
     {
-        $this->makeRequest('HEAD', $url, $query, $body);
+        $response = $this->makeRequest('HEAD', $url, $data, $options);
+        if ($response->isOk) {
+            return $response->getHeaders()->toArray();
+        }
 
-        return $this->_response->getHeaders();
+        return [];
     }
 
     /**
      * Performs POST HTTP request.
      * @param string $url URL
-     * @param array $query query options
-     * @param string $body request body
-     * @param bool $raw if response body contains JSON and should be decoded
+     * @param array $data query data
+     * @param array $options request options
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function post($url, $query = [], $body = null, $raw = false)
+    public function post($url, $data = [], $options = [])
     {
-        return $this->makeRequest('POST', $url, $query, $body, $raw);
+        $this->makeRequest('POST', $url, $data, $options);
+        return $this->getResponseJsonContent();
     }
 
     /**
      * Performs PUT HTTP request.
      * @param string $url URL
-     * @param array $query query options
-     * @param string $body request body
-     * @param bool $raw if response body contains JSON and should be decoded
+     * @param array $data query data
+     * @param array $options request options
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function put($url, $query = [], $body = null, $raw = false)
+    public function put($url, $data = [], $options = [])
     {
-        return $this->makeRequest('PUT', $url, $query, $body, $raw);
+        $this->makeRequest('PUT', $url, $data, $options);
+        return $this->getResponseJsonContent();
     }
 
     /**
      * Performs DELETE HTTP request.
      * @param string $url URL
-     * @param array $query query options
-     * @param string $body request body
-     * @param bool $raw if response body contains JSON and should be decoded
+     * @param array $data query data
+     * @param array $options request options
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function delete($url, $query = [], $body = null, $raw = false)
+    public function delete($url, $data = [], $options = [])
     {
-        return $this->makeRequest('DELETE', $url, $query, $body, $raw);
+        $this->makeRequest('DELETE', $url, $data, $options);
+        return $this->getResponseJsonContent();
     }
 
     /**
      * Make request and check for error.
      * @param string $method
      * @param string $url URL
-     * @param array $query query options, (GET parameters)
-     * @param string $body request body, (POST parameters)
-     * @param bool $raw if response body contains JSON and should be decoded
+     * @param array $data query data, (GET parameters)
+     * @param array $options request options, (POST parameters)
      * @throws \yii\base\InvalidConfigException
      * @return mixed response
      */
-    public function makeRequest($method, $url, $query = [], $body = null, $raw = false)
+    public function makeRequest($method, $url, $data = [], $options = [])
     {
-        return $this->handleRequest($method, $this->prepareUrl($url, $query), $body, $raw);
-    }
-
-    /**
-     * Creates URL.
-     * @param mixed $path path
-     * @param array $query query options
-     * @return array
-     */
-    private function prepareUrl($path, array $query = [])
-    {
-        $url = $path;
-        $query = array_merge($this->getAuth(), $query);
-        if (!empty($query)) {
-            $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query($query);
-        }
-
-        return $url;
+        return $this->handleRequest($method, $url, $data, $options);
     }
 
     /**
@@ -251,38 +232,45 @@ class Connection extends Component
      *
      * @param string $method POST, GET, etc
      * @param string $url the URL for request, not including proto and site
-     * @param array|string $body the request body. When array - will be sent as POST params, otherwise - as RAW body.
-     * @param bool $raw Whether to decode data, when response is decodeable (JSON).
-     * @return array|string
+     * @param array $data the URL for request, not including proto and site
+     * @param array $options
+     * @return Response
      */
-    protected function handleRequest($method, $url, $body = null, $raw = false)
+    protected function handleRequest($method, $url, $data = [], $options = [])
     {
         $method = strtoupper($method);
-        $profile = $method . ' ' . $url . '#' . (is_array($body) ? http_build_query($body) : $body);
-        $options = [(is_array($body) ? 'form_params' : 'body') => $body];
+        $profile = $method . ' ' . $url . '#' . serialize(['data' => $data, 'options' => $options]);
         Yii::beginProfile($profile, __METHOD__);
-        $this->_response = $this->getHandler()->request($method, $url, $options);
+        $this->_response = $this->_client
+            ->createRequest()
+            ->setMethod($method)
+            ->setUrl($url)
+            ->setData($data)
+            ->setOptions($options)
+            ->send();
         Yii::endProfile($profile, __METHOD__);
 
-        $res = $this->_response->getBody()->getContents();
-        if (!$raw && preg_grep('|application/json|i', $this->_response->getHeader('Content-Type'))) {
-            $res = Json::decode($res);
-        }
-
-        return $res;
+        return $this->_response;
     }
 
     /**
-     * Returns the request handler (Guzzle client for the moment).
-     * Creates and setups handler if not set.
-     * @return Handler
+     * @return mixed
+     * @throws \Exception
      */
-    public function getHandler()
+    protected function getResponseJsonContent()
     {
-        if (static::$_handler === null) {
-            static::$_handler = new Handler($this->config);
+        if (preg_match('|application/json|i', $this->_response->getHeaders()->get('content-type'))) {
+            return Json::decode($this->_response->getContent());
         }
 
-        return static::$_handler;
+        throw new \Exception('Данные не в json формета');
+    }
+
+    /**
+     * @return Response
+     */
+    public function getResponse()
+    {
+        return $this->_response;
     }
 }

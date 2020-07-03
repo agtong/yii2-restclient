@@ -6,7 +6,7 @@
 ## Как устроено
 
 Реализация поиска аналогична обычному поиску. То есть необходимо реализовать модель поиска, в которой обрабатывается GET параметры.
-Пример модели: [TestSearch](../example-client/models/TestSearch.php).
+Пример модели: [TestSearch](../example/client/models/TestSearch.php).
 
 При поиске по параметру на клиенте, параметры поиска добавляются к api ссылке GET параметрами. Параметры передаются в массиве.
 
@@ -34,9 +34,13 @@
                 'prepareDataProvider' => function ($action) {
                     $modelClass = $action->modelClass;
                     $searchClass = $this->searchClass;
+                    $params = ArrayHelper::merge(
+                        Yii::$app->request->get(mb_substr(mb_strrchr($searchClass, '\\'), 1), []),
+                        Yii::$app->request->post(mb_substr(mb_strrchr($searchClass, '\\'), 1), [])
+                    );
 
                     $query = ($searchClass)
-                        ? $searchClass::search(\Yii::$app->request->get(mb_substr(mb_strrchr($searchClass, '\\'), 1)))
+                        ? $searchClass::search($params)
                         : $modelClass::find();
 
                     return new ActiveDataProvider([
